@@ -1,0 +1,11 @@
+{
+  "name": "@workspace/api-spec",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "codegen": "cp ../../lib/api-zod/src/index.ts /tmp/.api-zod-barrel-backup && orval --config ./orval.config.ts && cp /tmp/.api-zod-barrel-backup ../../lib/api-zod/src/index.ts && pnpm -w run typecheck:libs"
+  },
+  "devDependencies": {
+    "orval": "^8.20.0"
+  }
+}

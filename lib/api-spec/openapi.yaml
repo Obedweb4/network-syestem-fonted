@@ -1,0 +1,3783 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: PulseNet Billing API
+servers:
+  - url: /api
+    description: Base API path
+
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: dashboard
+    description: Dashboard & analytics
+  - name: customers
+    description: Customer management
+  - name: plans
+    description: Service plans & subscriptions
+  - name: invoices
+    description: Invoicing & payments
+  - name: vouchers
+    description: Voucher batches & vouchers
+  - name: routers
+    description: Router management & monitoring
+  - name: notifications
+    description: Notification templates & logs
+  - name: users
+    description: Staff user management
+  - name: portal
+    description: Customer self-service portal
+  - name: radius
+    description: RADIUS AAA server config, auth audit, sessions & disconnect
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Staff login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Rotate tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInput"
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "401":
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInput"
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new tenant and admin user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "201":
+          description: Tenant and user created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request a password reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: Reset instructions sent if the account exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── DASHBOARD ───────────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Dashboard KPI summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/revenue-chart:
+    get:
+      operationId: getRevenueChart
+      tags: [dashboard]
+      summary: Daily revenue for the last 30 days
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revenue time series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RevenueDataPoint"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent platform activity feed
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recent activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/subscription-stats:
+    get:
+      operationId: getSubscriptionStats
+      tags: [dashboard]
+      summary: Subscription status breakdown
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Subscription counts by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStats"
+
+  /dashboard/ai-analysis:
+    get:
+      operationId: getAiAnalysis
+      tags: [dashboard]
+      summary: AI network health analysis
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: AI-generated network health report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAnalysis"
+
+  # ─── CUSTOMERS ───────────────────────────────────────────────────────────────
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerPage"
+
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create customer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Customer detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateCustomer
+      tags: [customers]
+      summary: Update customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      summary: Soft-delete customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /customers/{id}/wallet:
+    get:
+      operationId: getCustomerWallet
+      tags: [customers]
+      summary: Get customer wallet & transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Wallet info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletDetail"
+
+  /customers/{id}/loyalty:
+    get:
+      operationId: getCustomerLoyalty
+      tags: [customers]
+      summary: Get customer Loyalty points
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Loyalty account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyDetail"
+
+  /customers/{id}/recharge:
+    post:
+      operationId: rechargeCustomerWallet
+      tags: [customers]
+      summary: Credit a customer's prepaid wallet (admin-initiated, e.g. cash top-up)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  exclusiveMinimum: 0
+                reference:
+                  type: string
+      responses:
+        "201":
+          description: Wallet recharged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customerId:
+                    type: string
+                    format: uuid
+                  balance:
+                    type: number
+                  message:
+                    type: string
+        "404":
+          description: Customer or wallet not found
+
+  /customers/{id}/refill:
+    post:
+      operationId: refillCustomerSubscription
+      tags: [customers]
+      summary: Extend a customer's active subscription by N days, without changing plan speed or price
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [days]
+              properties:
+                days:
+                  type: integer
+                  minimum: 1
+                  maximum: 365
+      responses:
+        "200":
+          description: Subscription extended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription:
+                    $ref: "#/components/schemas/Subscription"
+                  message:
+                    type: string
+        "409":
+          description: Customer has no active subscription to refill
+
+  # ─── SERVICE PLANS ───────────────────────────────────────────────────────────
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List service plans
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [HOTSPOT, PPPOE]
+      responses:
+        "200":
+          description: Plan list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServicePlan"
+
+    post:
+      operationId: createPlan
+      tags: [plans]
+      summary: Create service plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicePlan"
+
+  /plans/{id}:
+    get:
+      operationId: getPlan
+      tags: [plans]
+      summary: Get service plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Plan detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicePlan"
+
+    patch:
+      operationId: updatePlan
+      tags: [plans]
+      summary: Update service plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicePlan"
+
+    delete:
+      operationId: deletePlan
+      tags: [plans]
+      summary: Delete service plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── SUBSCRIPTIONS ───────────────────────────────────────────────────────────
+  /subscriptions:
+    get:
+      operationId: listSubscriptions
+      tags: [plans]
+      summary: List subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, SUSPENDED, EXPIRED, CANCELLED]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Subscription list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPage"
+
+    post:
+      operationId: createSubscription
+      tags: [plans]
+      summary: Create subscription
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+  /subscriptions/{id}:
+    get:
+      operationId: getSubscription
+      tags: [plans]
+      summary: Get subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Subscription detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+    patch:
+      operationId: updateSubscription
+      tags: [plans]
+      summary: Update subscription status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+  # ─── INVOICES ────────────────────────────────────────────────────────────────
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List invoices
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING, PAID, VOID]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoicePage"
+
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create invoice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      summary: Get invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Invoice detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+    patch:
+      operationId: updateInvoice
+      tags: [invoices]
+      summary: Update invoice status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}/payments:
+    get:
+      operationId: getInvoicePayments
+      tags: [invoices]
+      summary: Get payments for an invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      operationId: recordInvoicePayment
+      tags: [invoices]
+      summary: Record a payment against an invoice
+      description: >-
+        Prefer this over the standalone POST /payments when paying a specific
+        invoice — both apply the same PAID-status and WALLET-debit side
+        effects, but this one also 404s on an invoice that doesn't belong to
+        the caller's tenant before writing anything.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "201":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments:
+    post:
+      operationId: recordPayment
+      tags: [invoices]
+      summary: Record a payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "201":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/report:
+    get:
+      operationId: getPaymentsReport
+      tags: [invoices]
+      summary: Payments report
+      description: Totals received, a breakdown by payment method, and the 50 most recent payments — powers the admin "Reports" tab on the Invoices page.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Report data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalReceived:
+                    type: number
+                  paymentCount:
+                    type: integer
+                  byMethod:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        method:
+                          type: string
+                        total:
+                          type: number
+                        count:
+                          type: integer
+                  recent:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/Payment"
+                        - type: object
+                          properties:
+                            customerName:
+                              type: string
+
+  # ─── VOUCHERS ────────────────────────────────────────────────────────────────
+  /voucher-batches:
+    get:
+      operationId: listVoucherBatches
+      tags: [vouchers]
+      summary: List voucher batches
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Voucher batch list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VoucherBatch"
+
+    post:
+      operationId: createVoucherBatch
+      tags: [vouchers]
+      summary: Create voucher batch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoucherBatchInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoucherBatch"
+
+  /voucher-batches/{id}:
+    get:
+      operationId: getVoucherBatch
+      tags: [vouchers]
+      summary: Get voucher batch with voucher stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Voucher batch detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoucherBatchDetail"
+
+  /voucher-batches/{id}/vouchers:
+    get:
+      operationId: listVouchers
+      tags: [vouchers]
+      summary: List vouchers in a batch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [UNUSED, USED, EXPIRED, VOID]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Voucher list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoucherPage"
+
+  /vouchers/redeem:
+    post:
+      operationId: redeemVoucher
+      tags: [vouchers]
+      summary: Redeem a voucher
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoucherRedeemInput"
+      responses:
+        "200":
+          description: Voucher redeemed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Voucher"
+        "400":
+          description: Invalid or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── ROUTERS ─────────────────────────────────────────────────────────────────
+  /routers:
+    get:
+      operationId: listRouters
+      tags: [routers]
+      summary: List routers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: siteId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Router list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Router"
+
+    post:
+      operationId: createRouter
+      tags: [routers]
+      summary: Add router
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RouterInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Router"
+
+  /routers/{id}:
+    get:
+      operationId: getRouter
+      tags: [routers]
+      summary: Get router detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Router detail with metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouterDetail"
+
+    patch:
+      operationId: updateRouter
+      tags: [routers]
+      summary: Update router
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RouterUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Router"
+
+    delete:
+      operationId: deleteRouter
+      tags: [routers]
+      summary: Delete router
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /routers/{id}/alerts:
+    get:
+      operationId: getRouterAlerts
+      tags: [routers]
+      summary: Get router alerts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: isResolved
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Router alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RouterAlert"
+
+  /routers/{id}/alerts/{alertId}/resolve:
+    post:
+      operationId: resolveRouterAlert
+      tags: [routers]
+      summary: Resolve a router alert
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouterAlert"
+
+  /routers/{id}/sessions:
+    get:
+      operationId: getHotspotSessions
+      tags: [routers]
+      summary: Get active hotspot sessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Hotspot sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HotspotSession"
+
+  # ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+  /notification-templates:
+    get:
+      operationId: listNotificationTemplates
+      tags: [notifications]
+      summary: List notification templates
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NotificationTemplate"
+
+    post:
+      operationId: createNotificationTemplate
+      tags: [notifications]
+      summary: Create notification template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplate"
+
+  /notification-templates/{id}:
+    patch:
+      operationId: updateNotificationTemplate
+      tags: [notifications]
+      summary: Update notification template
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplate"
+
+    delete:
+      operationId: deleteNotificationTemplate
+      tags: [notifications]
+      summary: Delete notification template
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notification-logs:
+    get:
+      operationId: listNotificationLogs
+      tags: [notifications]
+      summary: List notification logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [QUEUED, SENT, DELIVERED, FAILED]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Notification log list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationLogPage"
+
+  # ─── STAFF USERS ─────────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List staff users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Staff user list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffUser"
+
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create staff user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffUserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffUser"
+
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update staff user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffUserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffUser"
+
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Deactivate staff user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /portal/packages:
+    get:
+      summary: List active hotspot packages (public)
+      operationId: listPortalPackages
+      tags: [portal]
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of active hotspot packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HotspotPackagePublic"
+
+  /portal/auth/otp/request:
+    post:
+      summary: Request a customer login OTP (step 1 of 2)
+      operationId: portalRequestOtp
+      tags: [portal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalOtpRequest"
+      responses:
+        "200":
+          description: Always returns this, whether or not the number is registered (prevents customer enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /portal/auth/otp/verify:
+    post:
+      summary: Verify a customer login OTP and issue tokens (step 2 of 2)
+      operationId: portalVerifyOtp
+      tags: [portal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalOtpVerify"
+      responses:
+        "200":
+          description: Auth tokens + customer info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerAuthTokenResponse"
+        "401":
+          description: Invalid or expired code
+
+  /portal/auth/refresh:
+    post:
+      summary: Refresh customer access token
+      operationId: portalRefreshToken
+      tags: [portal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: New access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerTokenRefreshResponse"
+        "401":
+          description: Invalid refresh token
+
+  /portal/auth/logout:
+    post:
+      summary: Customer portal logout
+      operationId: portalLogout
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /portal/me:
+    get:
+      summary: Get current customer profile
+      operationId: getPortalMe
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Customer profile with wallet and loyalty info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerPortalProfile"
+        "401":
+          description: Unauthorized
+    patch:
+      summary: Update the current customer's profile details
+      operationId: updatePortalMe
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePortalProfileBody"
+      responses:
+        "200":
+          description: Updated customer profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerPortalProfile"
+        "400":
+          description: Validation failed
+        "401":
+          description: Unauthorized
+
+  /portal/dashboard:
+    get:
+      summary: Customer dashboard overview
+      operationId: getPortalDashboard
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDashboardData"
+        "401":
+          description: Unauthorized
+
+  /portal/sessions/current:
+    get:
+      summary: Get current active hotspot session
+      operationId: getPortalCurrentSession
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current session (null if none active)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerCurrentSessionResponse"
+        "401":
+          description: Unauthorized
+
+  /portal/sessions/history:
+    get:
+      summary: Get session history
+      operationId: getPortalSessionHistory
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: List of past sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomerSessionRecord"
+        "401":
+          description: Unauthorized
+
+  /portal/loyalty:
+    get:
+      summary: Get loyalty (Loyalty) balance and transaction history
+      operationId: getPortalLoyalty
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Loyalty data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerLoyaltyData"
+        "401":
+          description: Unauthorized
+
+  /portal/payments/stk-push:
+    post:
+      summary: Initiate an M-PESA STK Push to buy a hotspot package
+      description: >
+        Starts a simulated M-PESA STK Push prompt. If the request carries a
+        valid customer bearer token, the customer is resolved from the
+        token and the phone number is only used to display/confirm — the
+        caller does not need to be re-authenticated. If unauthenticated,
+        the phone number is required and a customer record is looked up or
+        created from it.
+      operationId: initiateStkPush
+      tags: [portal]
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StkPushRequestInput"
+      responses:
+        "201":
+          description: STK push initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StkPushRequestStatus"
+        "400":
+          description: Validation failed
+        "404":
+          description: Package not found
+
+  /portal/payments/stk-push/{id}:
+    get:
+      summary: Poll the status of an STK push request
+      operationId: getStkPushStatus
+      tags: [portal]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current status of the STK push request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StkPushRequestStatus"
+        "404":
+          description: Not found
+
+  /portal/loyalty/redeem:
+    post:
+      summary: Redeem loyalty points
+      operationId: portalRedeemLoyalty
+      tags: [portal]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoyaltyRedeemRequest"
+      responses:
+        "200":
+          description: Redemption result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyRedeemResponse"
+        "400":
+          description: Insufficient points or invalid request
+        "401":
+          description: Unauthorized
+
+  # ─── RADIUS ──────────────────────────────────────────────────────────────────
+  /radius/config:
+    get:
+      operationId: getRadiusConfig
+      tags: [radius]
+      summary: Get tenant RADIUS server config
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tenant's RADIUS config (secret never returned in plaintext)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusServerConfig"
+
+    put:
+      operationId: updateRadiusConfig
+      tags: [radius]
+      summary: Upsert tenant RADIUS server config
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RadiusServerConfigInput"
+      responses:
+        "200":
+          description: Updated config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusServerConfig"
+        "400":
+          description: Validation failed
+
+  /radius/auth-events:
+    get:
+      operationId: listRadiusAuthEvents
+      tags: [radius]
+      summary: Recent Access-Accept/Reject audit log
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [ACCESS_ACCEPT, ACCESS_REJECT]
+        - name: routerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Auth events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RadiusAuthEvent"
+
+  /radius/sessions/online:
+    get:
+      operationId: listRadiusOnlineSessions
+      tags: [radius]
+      summary: Currently-active RADIUS-accounted sessions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Online sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RadiusAccountingSession"
+
+  /radius/sessions:
+    get:
+      operationId: listRadiusSessions
+      tags: [radius]
+      summary: RADIUS accounting session history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, STOPPED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Session history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RadiusAccountingSession"
+
+  /radius/overview:
+    get:
+      operationId: getRadiusOverview
+      tags: [radius]
+      summary: Dashboard summary for Admin > RADIUS
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusOverview"
+
+  /radius/sessions/disconnect:
+    post:
+      operationId: disconnectRadiusSession
+      tags: [radius]
+      summary: Send a live RFC 5176 Disconnect-Request for one active session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Disconnect acknowledged by the NAS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusDisconnectResult"
+        "202":
+          description: Disconnect sent but not acknowledged (NAS unreachable/timed out)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RadiusDisconnectResult"
+        "404":
+          description: Session or NAS router not found
+        "409":
+          description: Session not active, or no RADIUS shared secret configured for this NAS
+
+# ─── COMPONENTS ──────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+      required: [email, password]
+
+    RefreshInput:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required: [refreshToken]
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+      required: [id, email, firstName, lastName, tenantId, roles]
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        tokenType:
+          type: string
+        user:
+          $ref: "#/components/schemas/AuthUser"
+      required: [accessToken, refreshToken, expiresIn, tokenType, user]
+
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+      required: [user]
+
+    SignupInput:
+      type: object
+      properties:
+        companyName:
+          type: string
+          minLength: 2
+        firstName:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+      required: [companyName, firstName, lastName, email, password]
+
+    ForgotPasswordInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required: [email]
+
+    ResetPasswordInput:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+      required: [token, password]
+
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      properties:
+        totalCustomers:
+          type: integer
+        pppoeClients:
+          type: integer
+        hotspotClients:
+          type: integer
+        activePppoeUsers:
+          type: integer
+        activeSubscriptions:
+          type: integer
+        todayRevenue:
+          type: number
+        monthRevenue:
+          type: number
+        outstandingBalance:
+          type: number
+        pendingInvoices:
+          type: integer
+        activeRouters:
+          type: integer
+        activeHotspotSessions:
+          type: integer
+        unusedVouchers:
+          type: integer
+        expiringSubscriptions:
+          type: integer
+      required:
+        - totalCustomers
+        - pppoeClients
+        - hotspotClients
+        - activePppoeUsers
+        - activeSubscriptions
+        - todayRevenue
+        - monthRevenue
+        - outstandingBalance
+        - pendingInvoices
+        - activeRouters
+        - activeHotspotSessions
+        - unusedVouchers
+        - expiringSubscriptions
+
+    RevenueDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        revenue:
+          type: number
+        paymentCount:
+          type: integer
+      required: [date, revenue, paymentCount]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        entityId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, description, entityId, createdAt]
+
+    SubscriptionStats:
+      type: object
+      properties:
+        active:
+          type: integer
+        suspended:
+          type: integer
+        expired:
+          type: integer
+        cancelled:
+          type: integer
+      required: [active, suspended, expired, cancelled]
+
+    NetworkAlert:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        message:
+          type: string
+      required: [severity, message]
+
+    AiAnalysis:
+      type: object
+      properties:
+        healthScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        summary:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkAlert"
+        recommendedActions:
+          type: array
+          items:
+            type: string
+        analyzedAt:
+          type: string
+          format: date-time
+      required: [healthScore, summary, alerts, recommendedActions, analyzedAt]
+
+    # ── Customers ─────────────────────────────────────────────────────────────
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        siteId:
+          type: ["string", "null"]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: string
+        nationalId:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, firstName, lastName, phone, isActive, createdAt, updatedAt]
+
+    CustomerDetail:
+      allOf:
+        - $ref: "#/components/schemas/Customer"
+        - type: object
+          properties:
+            activeSubscription:
+              $ref: "#/components/schemas/Subscription"
+            walletBalance:
+              type: number
+            loyaltyBalance:
+              type: integer
+            totalInvoices:
+              type: integer
+            totalPaid:
+              type: number
+
+    CustomerPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [data, total, page, limit]
+
+    CustomerInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        nationalId:
+          type: string
+        address:
+          type: string
+        siteId:
+          type: string
+          format: uuid
+      required: [firstName, lastName, phone]
+
+    CustomerUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        nationalId:
+          type: string
+        address:
+          type: string
+        isActive:
+          type: boolean
+        siteId:
+          type: ["string", "null"]
+
+    WalletDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        balance:
+          type: number
+        currency:
+          type: string
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletTransaction"
+      required: [id, balance, currency, transactions]
+
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        amount:
+          type: number
+        balanceAfter:
+          type: number
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, amount, balanceAfter, description, createdAt]
+
+    LoyaltyDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        balance:
+          type: integer
+        lifetimeEarned:
+          type: integer
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoyaltyTransaction"
+      required: [id, balance, lifetimeEarned, transactions]
+
+    LoyaltyTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        points:
+          type: integer
+        balanceAfter:
+          type: integer
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, points, balanceAfter, description, createdAt]
+
+    # ── Plans ─────────────────────────────────────────────────────────────────
+    ServicePlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [HOTSPOT, PPPOE]
+        price:
+          type: string
+        durationDays:
+          type: integer
+        dataLimitMb:
+          type: ["integer", "null"]
+        speedUpKbps:
+          type: ["integer", "null"]
+        speedDownKbps:
+          type: ["integer", "null"]
+        validityHours:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, name, type, price, durationDays, isActive, createdAt, updatedAt]
+
+    PlanInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [HOTSPOT, PPPOE]
+        price:
+          type: string
+        durationDays:
+          type: integer
+        dataLimitMb:
+          type: integer
+        speedUpKbps:
+          type: integer
+        speedDownKbps:
+          type: integer
+        validityHours:
+          type: integer
+      required: [name, type, price, durationDays]
+
+    PlanUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: string
+        durationDays:
+          type: integer
+        dataLimitMb:
+          type: ["integer", "null"]
+        speedUpKbps:
+          type: ["integer", "null"]
+        speedDownKbps:
+          type: ["integer", "null"]
+        validityHours:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+
+    # ── Subscriptions ─────────────────────────────────────────────────────────
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, EXPIRED, CANCELLED]
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        autoRenew:
+          type: boolean
+        planName:
+          type: ["string", "null"]
+        customerName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, customerId, planId, status, startsAt, expiresAt, autoRenew, createdAt, updatedAt]
+
+    SubscriptionPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [data, total, page, limit]
+
+    SubscriptionInput:
+      type: object
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        autoRenew:
+          type: boolean
+      required: [customerId, planId, startsAt]
+
+    SubscriptionUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, EXPIRED, CANCELLED]
+        autoRenew:
+          type: boolean
+
+    # ── Invoices ──────────────────────────────────────────────────────────────
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        subscriptionId:
+          type: ["string", "null"]
+        amount:
+          type: string
+        taxAmount:
+          type: string
+        totalAmount:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, PENDING, PAID, VOID]
+        notes:
+          type: ["string", "null"]
+        dueAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: ["string", "null"]
+        customerName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, customerId, amount, taxAmount, totalAmount, status, dueAt, createdAt, updatedAt]
+
+    InvoicePage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [data, total, page, limit]
+
+    InvoiceInput:
+      type: object
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        subscriptionId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        taxAmount:
+          type: string
+        notes:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+      required: [customerId, amount, dueAt]
+
+    InvoiceUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [DRAFT, PENDING, PAID, VOID]
+        notes:
+          type: string
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        invoiceId:
+          type: ["string", "null"]
+        amount:
+          type: string
+        method:
+          type: string
+          enum: [MPESA, WALLET, LOYALTY, CASH]
+        reference:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, REFUNDED]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, customerId, amount, method, status, createdAt]
+
+    PaymentInput:
+      type: object
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        method:
+          type: string
+          enum: [MPESA, WALLET, LOYALTY, CASH]
+        reference:
+          type: string
+      required: [customerId, amount, method]
+
+    # ── Vouchers ──────────────────────────────────────────────────────────────
+    VoucherBatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        codePrefix:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        unitPrice:
+          type: string
+        costPrice:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        planName:
+          type: ["string", "null"]
+        routerId:
+          type: ["string", "null"]
+          format: uuid
+          description: Restricts self-serve captive-portal redemption to this hotspot/router. Null = valid at any of the tenant's hotspots.
+        siteId:
+          type: ["string", "null"]
+          format: uuid
+          description: Restricts self-serve captive-portal redemption to any hotspot at this site.
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, planId, name, quantity, unitPrice, isActive, createdAt]
+
+    VoucherBatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/VoucherBatch"
+        - type: object
+          properties:
+            unusedCount:
+              type: integer
+            usedCount:
+              type: integer
+            expiredCount:
+              type: integer
+
+    VoucherBatchInput:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        codePrefix:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: string
+        costPrice:
+          type: string
+        routerId:
+          type: string
+          format: uuid
+        siteId:
+          type: string
+          format: uuid
+      required: [planId, name, quantity, unitPrice]
+
+    Voucher:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        status:
+          type: string
+          enum: [UNUSED, USED, EXPIRED, VOID]
+        usedByCustomerId:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        usedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, batchId, code, status, createdAt]
+
+    VoucherPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Voucher"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [data, total, page, limit]
+
+    VoucherRedeemInput:
+      type: object
+      properties:
+        code:
+          type: string
+        customerId:
+          type: string
+          format: uuid
+      required: [code, customerId]
+
+    # ── Routers ───────────────────────────────────────────────────────────────
+    Router:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        siteId:
+          type: ["string", "null"]
+        name:
+          type: string
+        ipAddress:
+          type: string
+        apiPort:
+          type: integer
+        apiUsername:
+          type: string
+        model:
+          type: ["string", "null"]
+        firmwareVersion:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, name, ipAddress, apiPort, apiUsername, isActive, createdAt, updatedAt]
+
+    RouterDetail:
+      allOf:
+        - $ref: "#/components/schemas/Router"
+        - type: object
+          properties:
+            latestMetrics:
+              $ref: "#/components/schemas/RouterMetrics"
+            unresolvedAlerts:
+              type: integer
+            activeSessions:
+              type: integer
+
+    RouterMetrics:
+      type: object
+      properties:
+        cpuPercent:
+          type: ["number", "null"]
+        memoryUsedMb:
+          type: ["integer", "null"]
+        memoryTotalMb:
+          type: ["integer", "null"]
+        uptimeSeconds:
+          type: ["integer", "null"]
+        recordedAt:
+          type: string
+          format: date-time
+      required: [recordedAt]
+
+    RouterInput:
+      type: object
+      properties:
+        name:
+          type: string
+        ipAddress:
+          type: string
+        apiPort:
+          type: integer
+        apiUsername:
+          type: string
+        apiSecret:
+          type: string
+        model:
+          type: string
+        siteId:
+          type: string
+          format: uuid
+      required: [name, ipAddress, apiUsername, apiSecret]
+
+    RouterUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        ipAddress:
+          type: string
+        apiPort:
+          type: integer
+        apiUsername:
+          type: string
+        model:
+          type: string
+        isActive:
+          type: boolean
+
+    RouterAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        routerId:
+          type: string
+          format: uuid
+        alertType:
+          type: string
+        severity:
+          type: string
+          enum: [INFO, WARN, CRITICAL]
+        message:
+          type: string
+        isResolved:
+          type: boolean
+        resolvedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, routerId, alertType, severity, message, isResolved, createdAt]
+
+    HotspotSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        routerId:
+          type: string
+          format: uuid
+        customerId:
+          type: ["string", "null"]
+        macAddress:
+          type: string
+        ipAddress:
+          type: ["string", "null"]
+        bytesIn:
+          type: integer
+        bytesOut:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: ["string", "null"]
+        customerName:
+          type: ["string", "null"]
+      required: [id, routerId, macAddress, bytesIn, bytesOut, startedAt]
+
+    # ── Notifications ─────────────────────────────────────────────────────────
+    NotificationTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        channel:
+          type: string
+          enum: [SMS, EMAIL, WHATSAPP]
+        subject:
+          type: ["string", "null"]
+        bodyTemplate:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, name, channel, bodyTemplate, variables, isActive, createdAt]
+
+    NotificationTemplateInput:
+      type: object
+      properties:
+        name:
+          type: string
+        channel:
+          type: string
+          enum: [SMS, EMAIL, WHATSAPP]
+        subject:
+          type: string
+        bodyTemplate:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+      required: [name, channel, bodyTemplate]
+
+    NotificationTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+        bodyTemplate:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+
+    NotificationLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        templateId:
+          type: ["string", "null"]
+        customerId:
+          type: ["string", "null"]
+        channel:
+          type: string
+          enum: [SMS, EMAIL, WHATSAPP]
+        recipient:
+          type: string
+        status:
+          type: string
+          enum: [QUEUED, SENT, DELIVERED, FAILED]
+        errorMessage:
+          type: ["string", "null"]
+        sentAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        customerName:
+          type: ["string", "null"]
+      required: [id, tenantId, channel, recipient, status, createdAt]
+
+    NotificationLogPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required: [data, total, page, limit]
+
+    # ── Staff Users ───────────────────────────────────────────────────────────
+    StaffUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, email, firstName, lastName, isActive, roles, createdAt]
+
+    StaffUserInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        roles:
+          type: array
+          items:
+            type: string
+      required: [email, firstName, lastName, password]
+
+    StaffUserUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+
+    # ─── Portal Schemas ────────────────────────────────────────────────────
+
+    HotspotPackagePublic:
+      type: object
+      required: [id, name, price, durationDays]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: string
+        durationDays:
+          type: integer
+        validityHours:
+          type: integer
+          nullable: true
+        dataLimitMb:
+          type: integer
+          nullable: true
+        speedUpKbps:
+          type: integer
+          nullable: true
+        speedDownKbps:
+          type: integer
+          nullable: true
+
+    PortalOtpRequest:
+      type: object
+      required: [tenantId, phone]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        phone:
+          type: string
+          description: "Kenyan phone number, e.g. 0712345678"
+
+    PortalOtpVerify:
+      type: object
+      required: [tenantId, phone, code]
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        code:
+          type: string
+          description: "6-digit code sent to the phone"
+
+    CustomerAuthTokenResponse:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, tokenType, customer]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        tokenType:
+          type: string
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            firstName:
+              type: string
+            lastName:
+              type: string
+            phone:
+              type: string
+            accountNumber:
+              type: string
+              nullable: true
+            tenantId:
+              type: string
+              format: uuid
+
+    CustomerTokenRefreshResponse:
+      type: object
+      required: [accessToken, expiresIn, tokenType]
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+        tokenType:
+          type: string
+
+    CustomerPortalProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+        accountNumber:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        wallet:
+          type: object
+          nullable: true
+          properties:
+            balance:
+              type: string
+            currency:
+              type: string
+        loyalty:
+          type: object
+          nullable: true
+          properties:
+            balance:
+              type: integer
+            lifetimeEarned:
+              type: integer
+
+    StkPushRequestInput:
+      type: object
+      required: [planId, phone]
+      properties:
+        planId:
+          type: string
+          format: uuid
+        phone:
+          type: string
+          description: "M-PESA phone number to receive the STK push prompt, e.g. 0712345678"
+
+    StkPushRequestStatus:
+      type: object
+      required: [id, status, checkoutRequestId, amount, phone]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED]
+        checkoutRequestId:
+          type: string
+        amount:
+          type: string
+        phone:
+          type: string
+        failureReason:
+          type: string
+          nullable: true
+        subscriptionId:
+          type: string
+          format: uuid
+          nullable: true
+
+    UpdatePortalProfileBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+        lastName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+          nullable: true
+        address:
+          type: string
+          nullable: true
+
+    CustomerDashboardData:
+      type: object
+      properties:
+        activeSession:
+          nullable: true
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            macAddress:
+              type: string
+            ipAddress:
+              type: string
+              nullable: true
+            bytesIn:
+              type: integer
+            bytesOut:
+              type: integer
+            startedAt:
+              type: string
+              format: date-time
+        wallet:
+          nullable: true
+          type: object
+          properties:
+            balance:
+              type: string
+            currency:
+              type: string
+        loyalty:
+          nullable: true
+          type: object
+          properties:
+            balance:
+              type: integer
+            lifetimeEarned:
+              type: integer
+        recentSessionCount:
+          type: integer
+
+    CustomerCurrentSessionResponse:
+      type: object
+      properties:
+        session:
+          nullable: true
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            macAddress:
+              type: string
+            ipAddress:
+              type: string
+              nullable: true
+            bytesIn:
+              type: integer
+            bytesOut:
+              type: integer
+            startedAt:
+              type: string
+              format: date-time
+            durationSeconds:
+              type: integer
+
+    CustomerSessionRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        macAddress:
+          type: string
+        ipAddress:
+          type: string
+          nullable: true
+        bytesIn:
+          type: integer
+        bytesOut:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+
+    CustomerLoyaltyData:
+      type: object
+      properties:
+        balance:
+          type: integer
+        lifetimeEarned:
+          type: integer
+        transactions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+              points:
+                type: integer
+              balanceAfter:
+                type: integer
+              description:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+
+    LoyaltyRedeemRequest:
+      type: object
+      required: [points]
+      properties:
+        points:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+
+    LoyaltyRedeemResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        newBalance:
+          type: integer
+        transaction:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            type:
+              type: string
+            points:
+              type: integer
+            balanceAfter:
+              type: integer
+            description:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    RadiusServerConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        authPort:
+          type: integer
+        acctPort:
+          type: integer
+        defaultSessionTimeoutSec:
+          type: integer
+          nullable: true
+        defaultIdleTimeoutSec:
+          type: integer
+          nullable: true
+        defaultFramedPool:
+          type: string
+          nullable: true
+        interimUpdateIntervalSec:
+          type: integer
+        hasDefaultSecret:
+          type: boolean
+          description: Whether a default shared secret is configured. The secret itself is never returned.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RadiusServerConfigInput:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        authPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        acctPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        defaultSecret:
+          type: string
+          minLength: 8
+          description: Plaintext in, only ever stored encrypted; omit to leave the existing secret unchanged.
+        defaultSessionTimeoutSec:
+          type: integer
+          nullable: true
+        defaultIdleTimeoutSec:
+          type: integer
+          nullable: true
+        defaultFramedPool:
+          type: string
+          nullable: true
+        interimUpdateIntervalSec:
+          type: integer
+          minimum: 1
+
+    RadiusAuthEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        routerId:
+          type: string
+          format: uuid
+          nullable: true
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+        subscriptionId:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+        nasIpAddress:
+          type: string
+          nullable: true
+        callingStationId:
+          type: string
+          nullable: true
+        result:
+          type: string
+          enum: [ACCESS_ACCEPT, ACCESS_REJECT]
+        reasonCode:
+          type: string
+          description: "Machine-readable reason: unknown_user, subscription_suspended, subscription_expired, subscription_cancelled, bad_password, nas_unrecognized, nas_secret_mismatch, ok"
+        reasonMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    RadiusAccountingSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        routerId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+        subscriptionId:
+          type: string
+          format: uuid
+          nullable: true
+        sessionType:
+          type: string
+          enum: [PPPOE, HOTSPOT]
+        status:
+          type: string
+          enum: [ACTIVE, STOPPED]
+        username:
+          type: string
+        acctSessionId:
+          type: string
+        nasIpAddress:
+          type: string
+          nullable: true
+        nasPortId:
+          type: string
+          nullable: true
+        callingStationId:
+          type: string
+          nullable: true
+        framedIpAddress:
+          type: string
+          nullable: true
+        bytesIn:
+          type: integer
+        bytesOut:
+          type: integer
+        packetsIn:
+          type: integer
+        packetsOut:
+          type: integer
+        sessionTimeSec:
+          type: integer
+        terminateCause:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        lastInterimAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RadiusOverview:
+      type: object
+      properties:
+        onlineSessions:
+          type: integer
+        last24h:
+          type: object
+          properties:
+            accepts:
+              type: integer
+            rejects:
+              type: integer
+        nasRouters:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              lastRadiusContactAt:
+                type: string
+                format: date-time
+                nullable: true
+
+    RadiusDisconnectResult:
+      type: object
+      properties:
+        acked:
+          type: boolean
+        nak:
+          type: boolean
+          description: True if the NAS returned a Disconnect-NAK (rejected the request)
+        error:
+          type: string
+          nullable: true
+          description: Set on timeout, socket error, or an undecodable/unexpected response
