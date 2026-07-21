@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <title>PulseNet Wi-Fi</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 24px 16px; color: #11251a; background: #f2f8f4; font: 16px/1.45 Arial, sans-serif; }
+    main { width: min(100%, 900px); margin: 0 auto; }
+    .card { overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 14px 38px #163d2530; }
+    .precheck { text-align: center; color: #587060; font-size: 14px; padding: 60px 0; }
+    header { position: relative; padding: 24px 28px 20px; color: #fff; background: #087a39; text-align: center; }
+    header h1 { margin: 0 0 4px; font-size: 24px; }
+    header p { margin: 0; opacity: .92; font-size: 14px; }
+    header p.support { margin-top: 4px; opacity: .85; font-size: 12.5px; }
+
+    /* Header Login entry point — sits in the corner without touching the
+       centered title/logo/subtitle, which keep their own normal document
+       flow untouched. Absolute positioning is what makes that possible. */
+    .header-login { position: absolute; top: 18px; right: 18px; display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.4); color: #fff; border-radius: 999px; padding: 7px 14px; font: 700 13px Arial, sans-serif; cursor: pointer; line-height: 1; }
+    .header-login:hover { background: rgba(255,255,255,.24); }
+    .header-login svg { flex: none; }
+    .header-login .acct-initial { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.9); color: #087a39; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; }
+    @media (max-width: 480px) { .header-login { top: 12px; right: 12px; padding: 6px 10px; font-size: 11.5px; gap: 4px; } header h1 { font-size: 19px; } header { padding-right: 96px; padding-left: 96px; } }
+
+    /* Sign-in modal — opened from the header button. Same forms/logic that
+       used to sit inline at the bottom of the page, just relocated. */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(17,37,26,.55); z-index: 50; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; }
+    .modal-overlay.show { display: flex; }
+    .modal-box { position: relative; width: min(100%, 420px); background: #fff; border-radius: 16px; padding: 24px 22px 22px; box-shadow: 0 20px 50px #163d2545; }
+    .modal-box h3 { margin: 0 0 14px; font-size: 15px; display: flex; align-items: center; gap: 7px; }
+    .modal-close { position: absolute; top: 12px; right: 14px; background: none; border: 0; font-size: 22px; line-height: 1; color: #7b9184; cursor: pointer; padding: 4px; }
+    .modal-close:hover { color: #33473c; }
+
+    .banner { margin: 18px 28px 0; padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+    .banner.new { background: #eaf6ee; color: #0b5b28; }
+    .banner.expired { background: #fff4e5; color: #8a5300; }
+    .banner.suspended { background: #fdeceb; color: #8b1d1d; }
+    .banner.unknown { background: #eaf1fb; color: #0b3d78; }
+    .body-pad { padding: 20px 28px 28px; }
+
+    /* "How it works" steps strip — quick reference shown above the package grid */
+    .steps { margin: 0 0 18px; padding: 14px 16px; background: #f6faf7; border: 1px solid #dcebe1; border-radius: 12px; }
+    .steps ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 18px; counter-reset: step; }
+    .steps li { counter-increment: step; flex: 1 1 150px; font-size: 12.5px; color: #33473c; display: flex; gap: 8px; align-items: flex-start; }
+    .steps li::before { content: counter(step); flex: none; width: 20px; height: 20px; border-radius: 50%; background: #087a39; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    @media (max-width: 520px) { .steps li { flex-basis: 100%; } }
+
+    /* Package grid: 3 columns responsive down to 1 */
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+    .pkg { border: 1px solid #dcebe1; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; background: #fbfdfc; }
+    .pkg.popular { border-color: #087a39; box-shadow: 0 0 0 1px #087a39 inset; }
+    .pkg .tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #087a39; text-transform: uppercase; }
+    .pkg h3 { margin: 0; font-size: 16px; }
+    .pkg .price { font-size: 22px; font-weight: 800; color: #087a39; }
+    .pkg .meta { font-size: 12px; color: #587060; display: flex; flex-wrap: wrap; gap: 6px; }
+    .pkg .meta span { background: #eef5f1; border-radius: 999px; padding: 3px 8px; }
+    .pkg button { margin-top: auto; border: 0; border-radius: 9px; padding: 11px; color: #fff; background: #087a39; font: 700 14px Arial, sans-serif; cursor: pointer; }
+    .pkg.popular button { background: #d97706; }
+    .empty, .loading { text-align: center; color: #587060; padding: 24px 0; font-size: 14px; }
+
+    /* Purchase (phone) step */
+    .purchase { display: none; margin-top: 18px; padding: 16px; border-radius: 12px; background: #f6faf7; border: 1px solid #dcebe1; }
+    .purchase.show { display: block; }
+    .purchase h3 { margin: 0 0 4px; font-size: 15px; }
+    .purchase .sel { font-size: 13px; color: #587060; margin: 0 0 12px; }
+    label { display: block; margin: 0 0 6px; font-weight: 700; font-size: 13px; }
+    input[type="tel"], input[type="text"], input[type="password"] { width: 100%; margin: 0 0 12px; padding: 11px; border: 1px solid #b9cec0; border-radius: 9px; font: inherit; }
+    .saved-number { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin: 0 0 12px; background: #eef5f1; border-radius: 9px; font-size: 14px; }
+    .saved-number button { background: none; border: 0; color: #087a39; font-weight: 700; font-size: 12px; cursor: pointer; padding: 0; }
+    .purchase button.primary { width: 100%; border: 0; border-radius: 9px; padding: 12px; color: #fff; background: #087a39; font: 700 15px Arial, sans-serif; cursor: pointer; }
+    .purchase .cancel { display: block; width: 100%; text-align: center; background: none; border: 0; color: #587060; font-size: 13px; margin-top: 8px; cursor: pointer; }
+    .status-box { text-align: center; padding: 10px 0; }
+    .status-box .spinner { width: 30px; height: 30px; margin: 8px auto; border: 3px solid #dcebe1; border-top-color: #087a39; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-box.success h4 { color: #0b5b28; }
+    .status-box.failed h4 { color: #8b1d1d; }
+    .error { margin: 0 0 12px; padding: 10px; border-radius: 8px; color: #8b1d1d; background: #fff0f0; font-size: 13px; }
+
+    /* Alternative connection methods: "Already paid?" and "Redeem voucher" —
+       secondary to the primary buy flow, but their fields are visible
+       up-front (not collapsed) since a customer reaching for them already
+       knows what they want to do. */
+    .alt-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e3ede6; }
+    .alt-section h3 { margin: 0 0 10px; font-size: 14px; color: #11251a; }
+    .tabs { display: flex; gap: 6px; margin: 0 0 10px; }
+    .tabs button { flex: 1; border: 1px solid #b9cec0; background: #fff; color: #587060; border-radius: 8px; padding: 8px; font: 700 12px Arial, sans-serif; cursor: pointer; }
+    .tabs button.active { background: #eaf6ee; border-color: #087a39; color: #087a39; }
+    textarea { width: 100%; margin: 0 0 12px; padding: 11px; border: 1px solid #b9cec0; border-radius: 9px; font: inherit; resize: vertical; min-height: 76px; }
+    .alt-section button.primary { width: 100%; border: 0; border-radius: 9px; padding: 12px; color: #fff; background: #087a39; font: 700 15px Arial, sans-serif; cursor: pointer; }
+
+
+    .verify-link { text-align: center; margin-top: 14px; font-size: 13px; }
+    .verify-link a { color: #087a39; font-weight: 700; cursor: pointer; }
+    footer.hint { text-align: center; color: #7b9184; font-size: 12px; margin-top: 14px; }
+  </style>
+  $(if chap-id)
+  <script src="/md5.js"></script>
+  <script>
+    function doLogin() {
+      document.login.password.value = hexMD5('$(chap-id)' + document.login.password.value + '$(chap-challenge)');
+      document.login.submit();
+      return false;
+    }
+  </script>
+  $(endif)
+</head>
+<body>
+<main>
+  <!-- Shown while we check whether this device even needs the portal. An
+       active-package device should never see the branded card below — it
+       gets bounced through to $(link-orig) before this is ever revealed. -->
+  <div id="precheck" class="precheck">Checking your connection…</div>
+
+  <div id="card" class="card" style="display:none">
+    <header>
+      <button type="button" class="header-login" id="headerLoginBtn" aria-haspopup="dialog">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="headerLoginLabel">Log In</span>
+      </button>
+      <h1>PulseNet Wi-Fi</h1>
+      <p>Need help? 0743901680 / 0742378511</p>
+    </header>
+
+    <div id="banner" class="banner new" style="display:none"></div>
+
+    <div class="body-pad">
+      <div class="steps">
+        <ol>
+          <li>Select package</li>
+          <li>Enter M-PESA number</li>
+          <li>Tap Send</li>
+          <li>Enter PIN on your phone</li>
+          <li>Wait 15 seconds</li>
+        </ol>
+      </div>
+
+      <div id="loading" class="loading">Loading packages…</div>
+
+      <div id="grid" class="grid" style="display:none"></div>
+      <div id="empty" class="empty" style="display:none">No packages are available right now. Please contact support.</div>
+
+      <!-- Step 2: phone number, shown only after a package is picked -->
+      <div id="purchase" class="purchase">
+        <h3>Complete your purchase</h3>
+        <p class="sel" id="purchase-summary"></p>
+
+        <div id="savedNumberRow" class="saved-number" style="display:none">
+          <span id="savedNumberText"></span>
+          <button type="button" id="changeNumberBtn">Change Number</button>
+        </div>
+
+        <form id="purchase-form">
+          <div id="phoneField">
+            <label for="mpesa-phone">M-PESA phone number</label>
+            <input type="tel" id="mpesa-phone" inputmode="tel" placeholder="07XXXXXXXX" autocomplete="tel">
+          </div>
+          <div id="purchase-error" class="error" style="display:none"></div>
+          <button type="submit" class="primary" id="purchase-submit">Send M-PESA prompt</button>
+        </form>
+        <button type="button" class="cancel" id="purchase-cancel">Choose a different package</button>
+
+        <div id="stkStatus" class="status-box" style="display:none"></div>
+      </div>
+
+      <!-- "Unknown device" verification: existing customer, new phone/browser -->
+      <p class="verify-link" id="verifyLink" style="display:none">
+        Already a PulseNet customer? <a id="verifyLinkAction">Verify your number</a>
+      </p>
+
+      <!-- Both alt-flows are self-serve renewal paths (they create/extend a
+           subscription), so — like the package grid — they're hidden
+           entirely for a suspended account; see applyReason(). -->
+      <div id="altFlows">
+        <!-- Already paid? Reconnect without paying again, by receipt code or pasted SMS. -->
+        <div class="alt-section">
+          <h3>Reconnect Using M-PESA</h3>
+          <p style="margin:0 0 10px;font-size:12.5px;color:#587060">Already paid? Reconnect without paying again.</p>
+          <div class="tabs">
+            <button type="button" id="tabCode" class="active">Enter Transaction Code</button>
+            <button type="button" id="tabMessage">Paste M-PESA Message</button>
+          </div>
+          <form id="verify-form">
+            <input type="text" id="verify-code" placeholder="e.g. SFC1A2B3C4" autocomplete="off">
+            <textarea id="verify-message" placeholder="Paste the full M-PESA confirmation SMS here" style="display:none"></textarea>
+            <div id="verify-error" class="error" style="display:none"></div>
+            <button type="submit" class="primary" id="verify-submit">Verify &amp; Connect</button>
+          </form>
+          <div id="verifyStatus" class="status-box" style="display:none"></div>
+        </div>
+
+        <!-- Redeem a pre-paid voucher code and connect immediately. -->
+        <div class="alt-section">
+          <h3>Redeem Voucher</h3>
+          <form id="voucher-form">
+            <label for="voucher-code">Voucher Code</label>
+            <input type="text" id="voucher-code" placeholder="Enter voucher code" autocomplete="off">
+            <div id="voucher-error" class="error" style="display:none"></div>
+            <button type="submit" class="primary" id="voucher-submit">Redeem &amp; Connect</button>
+          </form>
+          <div id="voucherStatus" class="status-box" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- "Already Have an Account? Sign In" now lives in the #loginModal
+           dialog opened from the header button — same two tabs, same two
+           forms, same element ids, same JS below; only its position moved. -->
+    </div>
+  </div>
+
+  <!-- Sign-in modal: Account Number (self-serve AJAX reconnect, no password)
+       and Username & Password (the existing native RouterOS hotspot/PPPoE
+       login) — both unchanged from before, just relocated out of the
+       bottom-of-page block and into this dialog. -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+      <button type="button" class="modal-close" id="loginModalClose" aria-label="Close">&times;</button>
+      <h3 id="loginModalTitle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Sign In to Your Account
+      </h3>
+      <div class="tabs">
+        <button type="button" id="tabAccount" class="active">Account Number</button>
+        <button type="button" id="tabPassword">Username &amp; Password</button>
+      </div>
+
+      <div id="signInPanelAccount">
+        <form id="account-form">
+          <label for="account-number">Account Number</label>
+          <input type="text" id="account-number" placeholder="Enter your account number" autocomplete="off">
+          <div id="account-error" class="error" style="display:none"></div>
+          <button type="submit" class="primary" id="account-submit">Sign In &amp; Connect</button>
+        </form>
+        <div id="accountStatus" class="status-box" style="display:none"></div>
+      </div>
+
+      <div id="signInPanelPassword" style="display:none">
+        <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onsubmit="return doLogin()"$(endif)>
+          <input type="hidden" name="dst" value="$(link-orig)">
+          <input type="hidden" name="popup" value="true">
+          $(if error)<p class="error">$(error)</p>$(endif)
+          <label for="username">Username</label>
+          <input id="username" name="username" value="$(username)" autocomplete="username">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password">
+          <button type="submit" class="primary">Sign In &amp; Connect</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <footer class="hint">Powered By SkyConnect @2026</footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── Deployment configuration — set these two values when customising this file ──
+  var TENANT_ID = "REPLACE_WITH_TENANT_ID";
+  var API_BASE_URL = "https://api.pulsenet.example.com"; // must be in the api-server's CORS_ORIGINS
+  // Optional: this hotspot's router ID (as shown in the admin panel). Only
+  // needed if you create voucher batches restricted to a specific
+  // hotspot/site — leave blank otherwise; it has no effect on any other flow.
+  var ROUTER_ID = "";
+  // When true, a device/customer we don't recognise is always shown the portal
+  // (framed as "new or verify"). When false, unrecognised devices are treated
+  // the same as brand-new customers with no special "unknown device" messaging.
+  var REQUIRE_DEVICE_VERIFICATION = true;
+  // Display-only leniency window after a package's expiresAt before this page
+  // switches from "reconnecting" to "expired, please renew". This does NOT
+  // extend actual network access — that is enforced by the router-side expiry
+  // sweep independently. Keep at 0 unless you intend the two to diverge.
+  var GRACE_HOURS = 0;
+  // ──────────────────────────────────────────────────────────────────────────
+
+  var mac = "$(mac)"; // RouterOS Hotspot template variable — client's MAC address
+  var macKnown = mac.indexOf("$(mac)") === -1; // false if RouterOS didn't substitute it (e.g. static preview)
+  var savedPhoneKey = "pulsenet_saved_phone";
+
+  var el = {
+    precheck: document.getElementById("precheck"),
+    card: document.getElementById("card"),
+    banner: document.getElementById("banner"),
+    loading: document.getElementById("loading"),
+    grid: document.getElementById("grid"),
+    empty: document.getElementById("empty"),
+    purchase: document.getElementById("purchase"),
+    purchaseSummary: document.getElementById("purchase-summary"),
+    purchaseForm: document.getElementById("purchase-form"),
+    purchaseError: document.getElementById("purchase-error"),
+    purchaseSubmit: document.getElementById("purchase-submit"),
+    purchaseCancel: document.getElementById("purchase-cancel"),
+    phoneField: document.getElementById("phoneField"),
+    phoneInput: document.getElementById("mpesa-phone"),
+    savedNumberRow: document.getElementById("savedNumberRow"),
+    savedNumberText: document.getElementById("savedNumberText"),
+    changeNumberBtn: document.getElementById("changeNumberBtn"),
+    stkStatus: document.getElementById("stkStatus"),
+    verifyLink: document.getElementById("verifyLink"),
+    verifyLinkAction: document.getElementById("verifyLinkAction"),
+    altFlows: document.getElementById("altFlows"),
+
+    tabCode: document.getElementById("tabCode"),
+    tabMessage: document.getElementById("tabMessage"),
+    verifyForm: document.getElementById("verify-form"),
+    verifyCode: document.getElementById("verify-code"),
+    verifyMessage: document.getElementById("verify-message"),
+    verifyError: document.getElementById("verify-error"),
+    verifySubmit: document.getElementById("verify-submit"),
+    verifyStatus: document.getElementById("verifyStatus"),
+
+    voucherForm: document.getElementById("voucher-form"),
+    voucherCode: document.getElementById("voucher-code"),
+    voucherError: document.getElementById("voucher-error"),
+    voucherSubmit: document.getElementById("voucher-submit"),
+    voucherStatus: document.getElementById("voucherStatus"),
+
+    tabAccount: document.getElementById("tabAccount"),
+    tabPassword: document.getElementById("tabPassword"),
+    signInPanelAccount: document.getElementById("signInPanelAccount"),
+    signInPanelPassword: document.getElementById("signInPanelPassword"),
+    accountForm: document.getElementById("account-form"),
+    accountNumber: document.getElementById("account-number"),
+    accountError: document.getElementById("account-error"),
+    accountSubmit: document.getElementById("account-submit"),
+    accountStatus: document.getElementById("accountStatus"),
+
+    headerLoginBtn: document.getElementById("headerLoginBtn"),
+    headerLoginLabel: document.getElementById("headerLoginLabel"),
+    loginModal: document.getElementById("loginModal"),
+    loginModalClose: document.getElementById("loginModalClose"),
+  };
+
+  var selectedPlan = null;
+  var pollTimer = null;
+
+  function api(path) {
+    return API_BASE_URL.replace(/\/+$/, "") + path;
+  }
+
+  function fmtBytes(mb) {
+    if (!mb) return "Unlimited";
+    return mb >= 1024 ? (mb / 1024).toFixed(0) + " GB" : mb + " MB";
+  }
+  function fmtSpeed(kbps) {
+    if (!kbps) return null;
+    return kbps >= 1024 ? (kbps / 1024).toFixed(0) + " Mbps" : kbps + " Kbps";
+  }
+  function fmtValidity(hours, days) {
+    if (hours) return hours >= 24 ? Math.floor(hours / 24) + " day(s)" : hours + " hour(s)";
+    return days + " day(s)";
+  }
+
+  function showBanner(kind, text) {
+    el.banner.className = "banner " + kind;
+    el.banner.textContent = text;
+    el.banner.style.display = "block";
+  }
+
+  // ── Step 1: figure out why this device is seeing the portal ──
+  function loadDeviceStatus() {
+    var url = api("/api/portal/device-status?tenantId=" + encodeURIComponent(TENANT_ID) + "&graceHours=" + GRACE_HOURS + (macKnown ? "&mac=" + encodeURIComponent(mac) : ""));
+    fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+      applyReason(data.reason);
+    }).catch(function () {
+      // If the status check fails, fail open to showing the packages page —
+      // never fail open to ACTIVE, since that skips the portal entirely.
+      revealCard();
+      applyReason("NEW");
+    });
+  }
+
+  // A device with an active package must not see the portal at all — not the
+  // grid, not a banner, nothing. We bounce it straight to its original
+  // destination instead of ever revealing #card. If this device is genuinely
+  // already authorized on the router, $(link-orig) just loads normally; if
+  // there's a mismatch (router still intercepting despite an active DB
+  // subscription), this is a redirect loop back to this same check — that's
+  // an operational gap (device never got bound after payment), not something
+  // a static page can fix, so we don't pretend to "fix" it with a fake button.
+  function redirectToOrigin() {
+    var dest = "$(link-orig)";
+    if (!dest || dest.indexOf("$(link-orig)") !== -1) dest = "/";
+    window.location.href = dest;
+  }
+
+  function revealCard() {
+    el.precheck.style.display = "none";
+    el.card.style.display = "block";
+  }
+
+  function applyReason(reason) {
+    if (reason === "ACTIVE") {
+      redirectToOrigin();
+      return; // Card is never revealed for an active package.
+    }
+
+    revealCard();
+
+    if (reason === "SUSPENDED") {
+      showBanner("suspended", "Your account is suspended. Please contact support to restore access.");
+      el.loading.style.display = "none";
+      el.altFlows.style.display = "none"; // No self-serve renewal while suspended.
+      return;
+    }
+    if (reason === "EXPIRED") {
+      showBanner("expired", "Your package has expired. Choose a new one below to get back online.");
+    } else if (reason === "UNKNOWN_DEVICE" && REQUIRE_DEVICE_VERIFICATION) {
+      showBanner("unknown", "We don't recognise this device yet.");
+      el.verifyLink.style.display = "block";
+    } else {
+      showBanner("new", "Welcome! Choose a package to get connected.");
+    }
+    loadPackages();
+  }
+
+  // ── Step 2: package grid ──
+  function loadPackages() {
+    fetch(api("/api/portal/packages?tenantId=" + encodeURIComponent(TENANT_ID)))
+      .then(function (r) { return r.json(); })
+      .then(function (packages) {
+        el.loading.style.display = "none";
+        if (!packages || !packages.length) { el.empty.style.display = "block"; return; }
+        renderGrid(packages);
+      })
+      .catch(function () {
+        el.loading.style.display = "none";
+        el.empty.style.display = "block";
+      });
+  }
+
+  function renderGrid(packages) {
+    el.grid.innerHTML = "";
+    packages.forEach(function (pkg, index) {
+      var card = document.createElement("div");
+      card.className = "pkg" + (index === 0 ? " popular" : "");
+
+      var tag = index === 0 ? '<div class="tag">Most popular</div>' : "";
+      var speed = fmtSpeed(pkg.speedDownKbps);
+      var metaBits = [
+        '<span>' + fmtBytes(pkg.dataLimitMb) + '</span>',
+        '<span>' + fmtValidity(pkg.validityHours, pkg.durationDays) + '</span>',
+      ];
+      if (speed) metaBits.push('<span>Up to ' + speed + '</span>');
+
+      card.innerHTML =
+        tag +
+        '<h3>' + escapeHtml(pkg.name) + '</h3>' +
+        '<div class="price">KES ' + Number(pkg.price).toLocaleString() + '</div>' +
+        '<div class="meta">' + metaBits.join("") + '</div>' +
+        '<button type="button">Buy now</button>';
+
+      card.querySelector("button").addEventListener("click", function () { selectPlan(pkg); });
+      el.grid.appendChild(card);
+    });
+    el.grid.style.display = "grid";
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  // ── Step 3: phone prompt, only after a package is selected ──
+  function selectPlan(pkg) {
+    selectedPlan = pkg;
+    el.purchaseSummary.textContent = pkg.name + " — KES " + Number(pkg.price).toLocaleString();
+    el.purchaseError.style.display = "none";
+    el.stkStatus.style.display = "none";
+    el.purchaseForm.style.display = "block";
+
+    var saved = window.localStorage.getItem(savedPhoneKey);
+    if (saved) {
+      el.savedNumberText.textContent = "Send to " + saved;
+      el.savedNumberRow.style.display = "flex";
+      el.phoneField.style.display = "none";
+      el.phoneInput.value = saved;
+    } else {
+      el.savedNumberRow.style.display = "none";
+      el.phoneField.style.display = "block";
+      el.phoneInput.value = "";
+    }
+
+    el.purchase.className = "purchase show";
+    el.purchase.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  el.changeNumberBtn.addEventListener("click", function () {
+    el.savedNumberRow.style.display = "none";
+    el.phoneField.style.display = "block";
+    el.phoneInput.value = "";
+    el.phoneInput.focus();
+  });
+
+  el.purchaseCancel.addEventListener("click", function () {
+    el.purchase.className = "purchase";
+    selectedPlan = null;
+    if (pollTimer) clearTimeout(pollTimer);
+  });
+
+  el.purchaseForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!selectedPlan) return;
+    var phone = el.phoneInput.value.trim();
+    if (!/^0[17]\d{8}$/.test(phone)) {
+      el.purchaseError.textContent = "Enter a valid M-PESA phone number, e.g. 0712345678";
+      el.purchaseError.style.display = "block";
+      return;
+    }
+    el.purchaseError.style.display = "none";
+    window.localStorage.setItem(savedPhoneKey, phone);
+
+    el.purchaseSubmit.disabled = true;
+    el.purchaseSubmit.textContent = "Sending…";
+
+    fetch(api("/api/portal/payments/stk-push"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: selectedPlan.id, phone: phone, mac: macKnown ? mac : undefined }),
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("stk-push-failed");
+        return r.json();
+      })
+      .then(function (push) {
+        el.purchaseForm.style.display = "none";
+        el.savedNumberRow.style.display = "none";
+        showStkStatus("pending", phone);
+        pollStatus(push.id);
+      })
+      .catch(function () {
+        el.purchaseSubmit.disabled = false;
+        el.purchaseSubmit.textContent = "Send M-PESA prompt";
+        el.purchaseError.textContent = "Could not start the payment. Please try again.";
+        el.purchaseError.style.display = "block";
+      });
+  });
+
+  function showStkStatus(kind, phone) {
+    el.stkStatus.style.display = "block";
+    if (kind === "pending") {
+      el.stkStatus.className = "status-box";
+      el.stkStatus.innerHTML = '<div class="spinner"></div><h4>Check your phone</h4><p>Enter your M-PESA PIN on the prompt sent to ' + escapeHtml(phone) + '.</p>';
+    } else if (kind === "binding") {
+      el.stkStatus.className = "status-box";
+      el.stkStatus.innerHTML = '<div class="spinner"></div><h4>Payment received!</h4><p>Activating your connection — this only takes a moment…</p>';
+    } else if (kind === "success") {
+      el.stkStatus.className = "status-box success";
+      el.stkStatus.innerHTML = "<h4>You're connected!</h4><p>Redirecting you now…</p>";
+    } else if (kind === "success-manual") {
+      // No MAC was captured for this payment (this browser loaded the page
+      // before RouterOS substituted $(mac), or the purchase came through a
+      // channel other than this captive page) — nothing to auto-bind, so
+      // this is the only path that still asks for a manual reconnect.
+      el.stkStatus.className = "status-box success";
+      el.stkStatus.innerHTML = "<h4>Payment received!</h4><p>Your package is now active. Reconnect to Wi-Fi to get online — if you have a voucher/account login, use the section below.</p>";
+    } else {
+      el.stkStatus.className = "status-box failed";
+      el.stkStatus.innerHTML = '<h4>Payment failed</h4><p>We could not confirm the M-PESA payment.</p><button type="button" id="retryPurchase" style="margin-top:8px;border:0;border-radius:9px;padding:10px 16px;background:#087a39;color:#fff;font:700 14px Arial;cursor:pointer">Try again</button>';
+      var retryBtn = document.getElementById("retryPurchase");
+      if (retryBtn) retryBtn.addEventListener("click", function () { if (selectedPlan) selectPlan(selectedPlan); });
+    }
+  }
+
+  function pollStatus(id) {
+    fetch(api("/api/portal/payments/stk-push/" + id))
+      .then(function (r) { return r.json(); })
+      .then(function (push) {
+        if (push.status === "COMPLETED") {
+          if (macKnown && push.deviceBound !== null && push.deviceBound !== undefined) {
+            pollDeviceBinding(id, Date.now());
+          } else {
+            showStkStatus("success-manual");
+          }
+          return;
+        }
+        if (push.status === "FAILED") { showStkStatus("failed"); return; }
+        pollTimer = window.setTimeout(function () { pollStatus(id); }, 1500);
+      })
+      .catch(function () {
+        pollTimer = window.setTimeout(function () { pollStatus(id); }, 3000);
+      });
+  }
+
+  // ── Step 4 (HOTSPOT devices only): wait for the RouterOS device binding
+  // to actually go through, then leave the captive page automatically — no
+  // "reconnect to Wi-Fi" step, no username, no password. Bounded to ~20s;
+  // a router that's slow or unreachable falls back to the manual message
+  // instead of spinning forever, and the binding itself keeps retrying
+  // server-side either way (see provisioning-engine.ts's retry sweep).
+  var BIND_POLL_TIMEOUT_MS = 20000;
+  function pollDeviceBinding(id, startedAt) {
+    showStkStatus("binding");
+    fetch(api("/api/portal/payments/stk-push/" + id))
+      .then(function (r) { return r.json(); })
+      .then(function (push) {
+        if (push.deviceBound === true) {
+          showStkStatus("success");
+          window.setTimeout(redirectToOrigin, 900);
+          return;
+        }
+        if (Date.now() - startedAt >= BIND_POLL_TIMEOUT_MS) {
+          showStkStatus("success-manual");
+          return;
+        }
+        pollTimer = window.setTimeout(function () { pollDeviceBinding(id, startedAt); }, 1500);
+      })
+      .catch(function () {
+        if (Date.now() - startedAt >= BIND_POLL_TIMEOUT_MS) { showStkStatus("success-manual"); return; }
+        pollTimer = window.setTimeout(function () { pollDeviceBinding(id, startedAt); }, 2000);
+      });
+  }
+
+  // ── "Unknown device" verification by phone (existing customer, new device) ──
+  el.verifyLinkAction.addEventListener("click", function () {
+    var phone = window.prompt("Enter the phone number your PulseNet account uses:");
+    if (!phone || !/^0[17]\d{8}$/.test(phone.trim())) return;
+    phone = phone.trim();
+    fetch(api("/api/portal/device-status?tenantId=" + encodeURIComponent(TENANT_ID) + "&phone=" + encodeURIComponent(phone) + "&graceHours=" + GRACE_HOURS))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.reason === "ACTIVE") {
+          // Verified as an active customer — leave the portal, don't linger in it.
+          window.localStorage.setItem(savedPhoneKey, phone);
+          redirectToOrigin();
+        } else if (data.reason === "EXPIRED") {
+          showBanner("expired", "Found your account — your package has expired. Choose a new one below.");
+        } else if (data.reason === "SUSPENDED") {
+          showBanner("suspended", "Your account is suspended. Please contact support.");
+          el.altFlows.style.display = "none";
+        } else {
+          showBanner("new", "We couldn't find an active package for that number. Choose one below.");
+        }
+      });
+  });
+
+  // ── "Already paid?" — verify by receipt code or pasted SMS, then bind this device ──
+  function setVerifyTab(which) {
+    var isCode = which === "code";
+    el.tabCode.className = isCode ? "active" : "";
+    el.tabMessage.className = isCode ? "" : "active";
+    el.verifyCode.style.display = isCode ? "block" : "none";
+    el.verifyMessage.style.display = isCode ? "none" : "block";
+  }
+  el.tabCode.addEventListener("click", function () { setVerifyTab("code"); });
+  el.tabMessage.addEventListener("click", function () { setVerifyTab("message"); });
+
+  function showAltError(elm, text) {
+    elm.textContent = text;
+    elm.style.display = "block";
+  }
+
+  el.verifyForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var isCodeTab = el.tabCode.className === "active";
+    var code = el.verifyCode.value.trim();
+    var message = el.verifyMessage.value.trim();
+    if (isCodeTab && !code) { showAltError(el.verifyError, "Enter your M-PESA transaction code."); return; }
+    if (!isCodeTab && !message) { showAltError(el.verifyError, "Paste your M-PESA confirmation message."); return; }
+    el.verifyError.style.display = "none";
+    el.verifySubmit.disabled = true;
+    el.verifySubmit.textContent = "Verifying…";
+
+    fetch(api("/api/portal/payments/verify"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenantId: TENANT_ID,
+        code: isCodeTab ? code : undefined,
+        message: isCodeTab ? undefined : message,
+        mac: macKnown ? mac : undefined,
+      }),
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (result) {
+        el.verifySubmit.disabled = false;
+        el.verifySubmit.textContent = "Verify & Connect";
+        if (!result.ok) { showAltError(el.verifyError, result.body.error || "We couldn't verify that payment."); return; }
+        el.verifyForm.style.display = "none";
+        pollBindByMac(el.verifyStatus, Date.now());
+      })
+      .catch(function () {
+        el.verifySubmit.disabled = false;
+        el.verifySubmit.textContent = "Verify & Connect";
+        showAltError(el.verifyError, "Could not verify right now. Please try again.");
+      });
+  });
+
+  // ── Redeem voucher, then bind this device — customer is resolved server-side by MAC ──
+  el.voucherForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = el.voucherCode.value.trim();
+    if (!code) { showAltError(el.voucherError, "Enter your voucher code."); return; }
+    el.voucherError.style.display = "none";
+    el.voucherSubmit.disabled = true;
+    el.voucherSubmit.textContent = "Redeeming…";
+
+    fetch(api("/api/portal/vouchers/redeem"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: TENANT_ID, code: code, mac: macKnown ? mac : undefined, routerId: ROUTER_ID || undefined }),
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (result) {
+        el.voucherSubmit.disabled = false;
+        el.voucherSubmit.textContent = "Redeem & Connect";
+        if (!result.ok) { showAltError(el.voucherError, result.body.error || "We couldn't redeem that voucher."); return; }
+        el.voucherForm.style.display = "none";
+        pollBindByMac(el.voucherStatus, Date.now());
+      })
+      .catch(function () {
+        el.voucherSubmit.disabled = false;
+        el.voucherSubmit.textContent = "Redeem & Connect";
+        showAltError(el.voucherError, "Could not redeem right now. Please try again.");
+      });
+  });
+
+  // Shared by both alt flows: confirm this device's binding went through by
+  // polling the exact same /portal/device-status endpoint the primary flow's
+  // precheck uses, then leave the portal automatically — no separate status
+  // endpoint, no "reconnect manually" step, matching the primary flow's UX.
+  function pollBindByMac(statusEl, startedAt) {
+    statusEl.style.display = "block";
+    if (!macKnown) {
+      statusEl.className = "status-box success";
+      statusEl.innerHTML = "<h4>You're all set!</h4><p>Your package is active. Reconnect to Wi-Fi to get online.</p>";
+      return;
+    }
+    statusEl.className = "status-box";
+    statusEl.innerHTML = '<div class="spinner"></div><h4>Connecting…</h4><p>Activating your connection — this only takes a moment.</p>';
+    fetch(api("/api/portal/device-status?tenantId=" + encodeURIComponent(TENANT_ID) + "&mac=" + encodeURIComponent(mac) + "&graceHours=" + GRACE_HOURS))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.reason === "ACTIVE" && data.deviceBound) {
+          statusEl.className = "status-box success";
+          statusEl.innerHTML = "<h4>You're connected!</h4><p>Redirecting you now…</p>";
+          window.setTimeout(redirectToOrigin, 900);
+          return;
+        }
+        if (Date.now() - startedAt >= BIND_POLL_TIMEOUT_MS) {
+          statusEl.className = "status-box success";
+          statusEl.innerHTML = "<h4>Payment confirmed!</h4><p>Your package is active. Reconnect to Wi-Fi to get online.</p>";
+          return;
+        }
+        window.setTimeout(function () { pollBindByMac(statusEl, startedAt); }, 1500);
+      })
+      .catch(function () {
+        if (Date.now() - startedAt >= BIND_POLL_TIMEOUT_MS) {
+          statusEl.className = "status-box success";
+          statusEl.innerHTML = "<h4>Payment confirmed!</h4><p>Your package is active. Reconnect to Wi-Fi to get online.</p>";
+          return;
+        }
+        window.setTimeout(function () { pollBindByMac(statusEl, startedAt); }, 2000);
+      });
+  }
+
+  // ── Header "Log In" button opens the same account sign-in dialog that
+  // used to sit inline at the bottom of the page — no new auth flow, just a
+  // new way to reach the existing one. ──
+  function openLoginModal() { el.loginModal.classList.add("show"); }
+  function closeLoginModal() { el.loginModal.classList.remove("show"); }
+  el.headerLoginBtn.addEventListener("click", openLoginModal);
+  el.loginModalClose.addEventListener("click", closeLoginModal);
+  el.loginModal.addEventListener("click", function (e) {
+    if (e.target === el.loginModal) closeLoginModal(); // click on the dimmed backdrop, not the box itself
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && el.loginModal.classList.contains("show")) closeLoginModal();
+  });
+
+  // ── "Already Have an Account? Sign In" — Account Number tab (AJAX reconnect, no password) vs Username & Password tab (native RouterOS form, submits by page navigation) ──
+  function setSignInTab(which) {
+    var isAccount = which === "account";
+    el.tabAccount.className = isAccount ? "active" : "";
+    el.tabPassword.className = isAccount ? "" : "active";
+    el.signInPanelAccount.style.display = isAccount ? "block" : "none";
+    el.signInPanelPassword.style.display = isAccount ? "none" : "block";
+  }
+  el.tabAccount.addEventListener("click", function () { setSignInTab("account"); });
+  el.tabPassword.addEventListener("click", function () { setSignInTab("password"); });
+
+  el.accountForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var accountNumber = el.accountNumber.value.trim();
+    if (!accountNumber) { showAltError(el.accountError, "Enter your account number."); return; }
+    el.accountError.style.display = "none";
+    el.accountSubmit.disabled = true;
+    el.accountSubmit.textContent = "Signing in…";
+
+    fetch(api("/api/portal/auth/reconnect-account"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: TENANT_ID, accountNumber: accountNumber, mac: macKnown ? mac : undefined }),
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (result) {
+        el.accountSubmit.disabled = false;
+        el.accountSubmit.textContent = "Sign In & Connect";
+        if (!result.ok) { showAltError(el.accountError, result.body.error || "We couldn't sign you in."); return; }
+        el.accountForm.style.display = "none";
+        pollBindByMac(el.accountStatus, Date.now());
+      })
+      .catch(function () {
+        el.accountSubmit.disabled = false;
+        el.accountSubmit.textContent = "Sign In & Connect";
+        showAltError(el.accountError, "Could not sign in right now. Please try again.");
+      });
+  });
+
+  loadDeviceStatus();
+})();
+</script>
+</body>
+</html>
