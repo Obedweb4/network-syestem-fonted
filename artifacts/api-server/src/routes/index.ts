@@ -1,0 +1,42 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import authRouter from "./auth";
+import dashboardRouter from "./dashboard";
+import customersRouter from "./customers";
+import plansRouter from "./plans";
+import subscriptionsRouter from "./subscriptions";
+import invoicesRouter from "./invoices";
+import vouchersRouter from "./vouchers";
+import routersRouter from "./routers";
+import notificationsRouter from "./notifications";
+import usersRouter from "./users";
+import tenantsRouter from "./tenants";
+import portalRouter from "./portal";
+import mpesaRouter from "./mpesa";
+import sessionsRouter from "./sessions";
+import nocRouter from "./noc";
+import settingsOverviewRouter from "./settings-overview";
+import radiusRouter from "./radius";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(authRouter);
+router.use(dashboardRouter);
+router.use(customersRouter);
+router.use(plansRouter);
+router.use(subscriptionsRouter);
+router.use(invoicesRouter);
+router.use(vouchersRouter);
+router.use(routersRouter);
+router.use(notificationsRouter);
+router.use(usersRouter);
+router.use(tenantsRouter);
+router.use(portalRouter);
+router.use(mpesaRouter);
+router.use(sessionsRouter);
+router.use(nocRouter);
+router.use(settingsOverviewRouter);
+router.use(radiusRouter);
+
+export default router;
