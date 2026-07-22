@@ -4,8 +4,8 @@ packages:
   - scripts
 
 allowBuilds:
-  bcrypt: set this to true or false
-  esbuild: set this to true or false
+  bcrypt: true
+  esbuild: true
 
 catalog:
   "@replit/vite-plugin-cartographer": "^0.3.2"
